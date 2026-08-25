@@ -107,14 +107,30 @@ Then:
 
 ## Phase 4 — Publish (human executes)
 
-Ask first: npm token / OTP ready? `gh auth status` or `GITHUB_TOKEN` ready?
+Ask first: `npm whoami` works? `gh auth status` or `GITHUB_TOKEN` ready?
+
+**Do not suggest `--otp=` by default** — EthereumJS maintainers publish after **`npm login`**, not per-command OTP. See auth below.
 
 Give these commands; **do not run them** unless the human explicitly asks the agent to:
 
 ```sh
-tsx scripts/release-npm.ts --publish=latest --otp=<code>
+tsx scripts/release-npm.ts --publish=latest
 tsx scripts/release-github.ts --version=<version>
 ```
+
+### npm auth (maintainer default)
+
+1. **`npm login`** in the terminal (once per session).
+2. Complete **2FA in the browser** when prompted.
+3. If npm offers to **skip follow-up checks** for this login, accept — that is what makes a long multi-package publish workable **without** passing `--otp` on every `npm publish`.
+4. Confirm: **`npm whoami`** prints your username.
+5. Run **`tsx scripts/release-npm.ts --publish=latest`** with **no `--otp` flag**.
+
+The release script forwards `--otp=` only when explicitly passed. With a normal `npm login` session, **omit it** — do not ask the human for a fresh authenticator code per package or per script run.
+
+Resume interrupted npm publish: `tsx scripts/release-npm.ts --publish=latest --start-with=<package>` (still no `--otp` unless the human uses a different auth setup).
+
+**When `--otp=` applies (not our default):** headless/CI, granular **Publish** tokens with per-operation 2FA, or when `npm login` did not establish a publish-capable session. **Automation** tokens skip `--otp` entirely but are a separate workflow — do not substitute unless the human asks.
 
 Notes for the human:
 
@@ -133,9 +149,11 @@ Automate where possible:
 ```
 - [ ] npm view @ethereumjs/<pkg> version for each ACTIVE_PACKAGES entry
 - [ ] gh release list / tags for @ethereumjs/<pkg>@<version>
-- [ ] Temp-dir smoke: npm install @ethereumjs/vm@<version> and import createVM (or npm pack)
+- [ ] Temp-dir smoke (fresh dir + online metadata): `npm i @ethereumjs/vm@<version> --prefer-online` then `import { createVM } from '@ethereumjs/vm'` — avoids stale local cache right after publish
 - [ ] Spot-check one GitHub release body vs CHANGELOG extract
 ```
+
+Right after publish, a local npm cache can still hold old registry metadata and fail installs for `@ethereumjs/tx@^<version>` even when the version is live — run the smoke check in a **new empty directory** with `--prefer-online`. This is **not** the monorepo `min-release-age` setting (that applies only inside this repo’s tree).
 
 Report mismatches; do not “fix” the registry. Summarize — then **STOP** until GO for phase 6.
 
@@ -153,7 +171,7 @@ Deliver a **paste-ready kit** (human posts — no Twitter/Discord MCP):
 2. Discord — slightly longer post
 3. Optional third channel only if emphasis warrants it
 
-**Visuals (v1):** text first. Optional simple release card via image generation if helpful. Code-snippet images are a follow-up.
+**Visuals:** scannable layout (see announce.md § Visual grammar). Optional snippet PNGs via `npm run snippet:png`. Attach manually; do not auto-post.
 
 ---
 
